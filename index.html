@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>메인트 편집기 @Blueming</title>
+<title>7단계: 톤 커스터마이징 + 칸 추가/삭제 + 이미지 그리드</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Gaegu:wght@700&family=Jua&display=swap" rel="stylesheet">
 <style>
   :root {
     --page-bg: #eef1ef;
@@ -118,8 +118,11 @@
 
   /* Pacifico는 영문 전용 폰트라 한글 글자가 없음 -> 한글을 쓰면 그 글자만
      자동으로 다음 순서인 카드 기본 서체(Pretendard 등)로 대체됨 (폰트 스택의 문자 단위 fallback) */
+  /* 폰트 스택은 글자 단위로 fallback 됨:
+     영문 -> Pacifico(필기체), 한글은 Pacifico에 글자가 없으므로
+     자동으로 다음 순서인 Jua(동글동글한 한글 서체)로 대체됨 */
   .display-name {
-    font-family: 'Pacifico', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Pacifico', 'Jua', 'Gaegu', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 24px; color: var(--accent); text-align: center; margin-top: 12px;
   }
 
@@ -406,7 +409,7 @@
                     <div class="frame empty" id="photoFrame">
                       <span class="empty-label">클릭해서 사진 업로드</span>
                     </div>
-                    <div class="display-name" contenteditable="true">Blueming</div>
+                    <div class="display-name" contenteditable="true">Nickname</div>
                     <div class="contact-note" contenteditable="true">연락은 <u>DM 또는 멘션</u></div>
                   </div>
 
