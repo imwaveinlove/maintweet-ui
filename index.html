@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7단계: 톤 커스터마이징 + 칸 추가/삭제 + 이미지 그리드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page-bg: #eef1ef;
+    --window-border: #dfe4e3;
+    --card-bg: #ffffff;
+    --ink: #55676a;
+    --sub: #9aa8aa;
+    --accent: #8ec3cc;       /* 사용자가 바꿀 수 있는 포인트 색 */
+    --btn-bg: rgba(142,195,204,0.16);
+    --btn-bg-hover: rgba(142,195,204,0.26);
+    --dot-pink: #f0b8c2;
+    --dot-yellow: #f3dca0;
+    --dot-green: #b7dcc2;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; background: var(--page-bg);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding: 40px 20px; gap: 18px;
+  }
+
+  .workspace { display: flex; align-items: flex-start; gap: 28px; flex-wrap: wrap; justify-content: center; }
+  /* position: relative -> 안에 붙는 스티커들이 이 카드를 기준으로 좌표를 잡음 */
+  .card-column { position: relative; display: flex; flex-direction: column; gap: 20px; width: 1000px; }
+
+  /* --- 창 --- */
+  .window {
+    border: 1px solid var(--window-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 28px rgba(90,110,110,0.10);
+    background: linear-gradient(135deg, #eef6f6, #dfeceb); /* 기본 그라데이션, 사용자가 교체 가능 */
+  }
+
+  .titlebar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(255,255,255,0.55);
+    padding: 12px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+  }
+  .traffic-dots { display: flex; gap: 7px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.pink { background: var(--dot-pink); }
+  .dot.yellow { background: var(--dot-yellow); }
+  .dot.green { background: var(--dot-green); }
+  .titlebar-icons { display: flex; gap: 16px; color: var(--sub); font-size: 16px; }
+
+  .window-body { padding: 20px; }
+
+  /* 그라데이션/톤이 배경에 깔리고, 그 안에 흰 패널이 콘텐츠를 담는 구조 */
+  .content-panel {
+    background: rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: 26px 26px 22px;
+  }
+
+  /* 왼쪽(프로필+INFO/NG)과 오른쪽(이미지 그리드)을 항상 좌우로 나란히 배치.
+     nowrap으로 고정해 그리드가 아래로 내려가지 않게 함 */
+  .main-columns { display: flex; align-items: flex-start; gap: 24px; flex-wrap: nowrap; }
+
+  /* min-width: 0 이 없으면 flex 아이템이 내용물 크기 아래로 줄어들지 못해
+     안쪽 고정폭 칸들 때문에 레이아웃이 밀려남 */
+  .left-column { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; }
+  .content-row { display: flex; gap: 26px; }
+
+  .photo-col { width: 190px; flex-shrink: 0; }
+  /* 사진 아래 이름·연락 문구가 사진 폭 기준 정확히 가운데 오도록 */
+  .photo-col .display-name,
+  .photo-col .contact-note { width: 100%; text-align: center; }
+
+  .frame {
+    position: relative; overflow: hidden; cursor: grab;
+    background: linear-gradient(135deg, #eef4f4, #dfeaea);
+    border-radius: 10px;
+  }
+  .frame.dragging { cursor: grabbing; }
+  .frame.empty {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--sub); font-size: 12px; text-align: center; cursor: pointer;
+  }
+  .frame img {
+    position: absolute; top: 50%; left: 50%; max-width: none;
+    user-select: none; -webkit-user-drag: none; pointer-events: none;
+  }
+  .photo-col > .frame { width: 190px; height: 190px; }
+
+  /* 이미지 변경 버튼: 프레임 전체가 아니라 오른쪽 위 작은 원형 버튼으로만 존재해야
+     드래그(mousedown)가 이 버튼 밖 영역에서는 정상적으로 먹힘 */
+  .change-overlay {
+    position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(60,80,80,0.6); color: white;
+    display: none; align-items: center; justify-content: center;
+    font-size: 13px; cursor: pointer; z-index: 5;
+  }
+  .frame.has-image:hover .change-overlay { display: flex; }
+
+  /* 그리드 칸에서는 오른쪽 위에 삭제(✕) 버튼이 있으므로,
+     변경(🔄) 버튼은 그 왼쪽에 나란히 배치 (아래쪽은 캡션 바에 가려질 수 있음) */
+  .photo-cell .change-overlay { top: 8px; right: 38px; }
+
+  [contenteditable="true"] {
+    outline: none; border-radius: 4px; padding: 2px 4px; margin: -2px -4px;
+    cursor: text; transition: background 0.15s;
+  }
+  [contenteditable="true"]:hover { background: rgba(0,0,0,0.04); }
+  [contenteditable="true"]:focus { background: rgba(142,195,204,0.12); box-shadow: 0 0 0 2px var(--accent); }
+
+  /* Pacifico는 영문 전용 폰트라 한글 글자가 없음 -> 한글을 쓰면 그 글자만
+     자동으로 다음 순서인 카드 기본 서체(Pretendard 등)로 대체됨 (폰트 스택의 문자 단위 fallback) */
+  .display-name {
+    font-family: 'Pacifico', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 24px; color: var(--accent); text-align: center; margin-top: 12px;
+  }
+
+  /* --- 연령/트윗성향/이별시: 사진 옆에 세로로 쌓임 --- */
+  .info-rows {
+    display: flex; flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .info-row {
+    position: relative;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+    padding: 6px 8px 8px;
+    border-radius: 8px;
+    width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .info-row:hover { background: rgba(0,0,0,0.04); }
+
+  .row-label { font-size: 11px; font-weight: 600; color: var(--sub); }
+  .row-value { font-size: 14px; font-weight: 700; color: var(--ink); text-align: left; }
+
+  /* "여기에 적어주세요" 같은 부가 설명: 칸 맨 아래에 작고 연하게 */
+  .row-note { font-size: 10.5px; color: var(--sub); text-align: left; width: 100%; overflow-wrap: anywhere; }
+
+  /* 연령·이별시처럼 "클릭해서 고르는" 칩 UI: 항상 가로 한 줄로 나열 */
+  .row-chips { display: flex; flex-direction: row; gap: 6px; flex-wrap: wrap; justify-content: flex-start; width: 100%; }
+  .chip {
+    border: 1px solid var(--window-border); background: white; color: var(--sub);
+    border-radius: 20px; padding: 3px 11px; font-size: 11px; cursor: pointer;
+    transition: all 0.15s;
+    /* 칩 안의 글자가 "탐라대/화"처럼 쪼개지지 않도록 */
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .chip.selected { background: var(--accent); border-color: var(--accent); color: white; font-weight: 700; }
+
+  /* 폭이 0이면서 줄 전체를 차지 -> flex 줄바꿈을 강제로 일으키는 투명 요소 */
+  .chip-break { flex-basis: 100%; height: 0; }
+
+  /* 연령/트윗성향/이별시: 사진 옆 상단 영역 */
+  .stat-bar {
+    display: flex; width: 100%;
+  }
+
+  /* 하단 INFO / NG: 좌우 2단 */
+  .info-columns {
+    display: flex; gap: 22px;
+    margin-top: 22px; padding-top: 18px;
+    border-top: 1px solid rgba(0,0,0,0.07);
+  }
+  .info-columns .info-block { flex: 1 1 0; min-width: 0; }
+
+  /* 사진 옆 상단 영역 (연령/트윗성향/이별시 태그를 담음) */
+  .menu-col { flex: 1; display: flex; flex-direction: column; padding-top: 2px; min-width: 0; }
+
+  .info-title {
+    font-size: 15px; font-weight: 800; letter-spacing: 0.5px;
+    color: var(--accent); margin-bottom: 6px; text-align: center;
+  }
+  .info-body {
+    font-size: 13px; line-height: 1.7; color: var(--ink);
+    background: var(--btn-bg);
+    border-radius: 10px; padding: 12px 14px;
+    min-height: 20px; text-align: center;
+  }
+
+  .contact-note { margin-top: 8px; font-size: 12px; color: var(--sub); text-align: center; }
+  .contact-note u { color: #7a9098; }
+
+  /* --- 오른쪽 열: 이미지 그리드. 위쪽 구분선 대신 왼쪽 세로 구분선으로 이어짐 --- */
+  .photo-section {
+    flex: 1 1 460px;
+    padding-left: 22px;
+    border-left: 1px solid rgba(0,0,0,0.07);
+  }
+  .photo-section-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; gap: 12px; }
+  .section-title { font-size: 15px; font-weight: 700; color: #3a4548; text-align: left; }
+  .section-caption { font-size: 12px; color: var(--sub); text-align: right; white-space: nowrap; }
+
+  .photo-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .photo-cell {
+    /* 참고 이미지 비율(가로가 세로보다 살짝 긴 5:4)에 맞춤.
+       photo-section 폭이 넓어져서 프로필 사진(190px)보다 확실히 커짐 */
+    position: relative; width: calc(50% - 7px); aspect-ratio: 5 / 4;
+    border-radius: 8px; overflow: hidden; background: #e2e2e2;
+  }
+  .photo-cell .frame { position: absolute; inset: 0; border-radius: 0; background: transparent; }
+
+  .cell-remove {
+    position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.45); color: #fff; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity 0.15s; z-index: 8;
+  }
+  .photo-cell:hover .cell-remove { opacity: 1; }
+
+  /* 캡션 켜기/끄기 토글 버튼: 켜져 있으면 색이 진해짐 */
+  .caption-toggle {
+    position: absolute; left: 10px; top: 10px;
+    background: rgba(55,60,63,0.55); color: #fff; font-size: 12px; font-weight: 600;
+    padding: 5px 12px; border-radius: 14px; cursor: pointer;
+    opacity: 0; transition: opacity 0.15s, background 0.15s; z-index: 7;
+  }
+  .photo-cell:hover .caption-toggle { opacity: 1; }
+  .caption-toggle.on { background: rgba(55,60,63,0.9); }
+
+  /* 반투명 + 살짝 블러 -> 뒤 사진이 비쳐 보이면서도 글씨는 잘 읽힘.
+     좌우 padding을 대칭으로 둬야 글씨가 정확히 가운데 옴 */
+  .caption-bar {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: rgba(60,64,68,0.45);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    padding: 7px 12px 8px; z-index: 6;
+  }
+  .caption-title {
+    color: #fff; font-weight: 700; font-size: 13px; text-align: center; line-height: 1.3;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5); /* 밝은 사진 위에서도 글씨가 읽히도록 */
+  }
+  .caption-tags {
+    color: #f0f0f0; font-size: 11px; text-align: center; margin-top: 2px; line-height: 1.35;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+
+  .add-cell-btn {
+    margin-top: 14px; width: 100%;
+    border: 1.5px dashed var(--accent); background: transparent; color: var(--sub);
+    border-radius: 10px; padding: 12px; font-size: 13px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .add-cell-btn:hover { background: rgba(0,0,0,0.03); }
+
+  /* --- 오른쪽 사이드 패널: 톤 설정 + 안내 --- */
+  .side-panel {
+    width: 230px; background: white; border: 1px solid var(--window-border);
+    border-radius: 14px; padding: 18px 20px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .side-panel h3 { margin: 0 0 10px; font-size: 13px; color: var(--ink); font-weight: 700; }
+
+  .tone-row { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--sub); margin-bottom: 8px; }
+  .tone-row input[type="color"] {
+    width: 30px; height: 26px; border: 1px solid var(--window-border); border-radius: 6px;
+    padding: 0; cursor: pointer; background: none;
+  }
+  .reset-tone-btn {
+    margin-top: 4px; width: 100%; border: 1px solid var(--window-border); background: #f7f7f6;
+    color: var(--sub); border-radius: 8px; padding: 7px; font-size: 12px; cursor: pointer;
+  }
+  .reset-tone-btn:hover { background: #f0efec; }
+
+  .side-panel ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .side-panel li { font-size: 12px; color: var(--sub); line-height: 1.6; display: flex; gap: 8px; }
+  .side-panel li b { color: var(--ink); }
+
+  .save-btn {
+    padding: 12px 28px; background: var(--ink); color: white; border: none;
+    border-radius: 30px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .save-btn:hover { opacity: 0.85; }
+
+  /* --- 스티커: 업로드한 PNG를 카드 위 아무 곳에나 붙임 --- */
+  .sticker {
+    position: absolute;
+    width: 110px; height: 110px;
+    user-select: none;
+    cursor: grab;
+    z-index: 50;
+  }
+  .sticker img {
+    width: 100%; height: 100%;
+    object-fit: contain;      /* 원본 비율 유지 */
+    pointer-events: none;     /* 드래그는 부모(.sticker)가 담당 */
+    -webkit-user-drag: none;
+    display: block;
+  }
+  .sticker.dragging { cursor: grabbing; }
+  .sticker.selected { outline: 2px dashed var(--accent); outline-offset: 5px; border-radius: 4px; }
+
+  /* 선택했을 때만 보이는 크기조절(오른쪽 아래) / 삭제(오른쪽 위) 핸들 */
+  .sticker-resize {
+    position: absolute; right: -9px; bottom: -9px; width: 16px; height: 16px;
+    background: var(--accent); border: 2px solid white; border-radius: 50%;
+    cursor: nwse-resize; display: none;
+  }
+  .sticker.selected .sticker-resize { display: block; }
+
+  .sticker-delete {
+    position: absolute; right: -9px; top: -9px; width: 18px; height: 18px;
+    background: #5c6b6e; color: white; border-radius: 50%; font-size: 10px;
+    align-items: center; justify-content: center; cursor: pointer; display: none;
+  }
+  .sticker.selected .sticker-delete { display: flex; }
+
+  /* 스티커 추가 버튼 (카드 밖 상단) */
+  .sticker-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: white; border: 1px solid var(--window-border);
+    border-radius: 30px; padding: 8px 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    font-size: 12.5px; color: var(--sub);
+  }
+  .sticker-bar button {
+    border: 1.5px dashed var(--accent); background: transparent; color: var(--sub);
+    border-radius: 20px; padding: 5px 14px; font-size: 12px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .sticker-bar button:hover { background: rgba(0,0,0,0.04); }
+
+  /* ===== 세로형 레이아웃: 이미지 그리드를 오른쪽이 아니라 INFO/NG 아래로 ===== */
+  .card-column.vertical { width: 620px; }
+
+  /* 좌우 2단 -> 위아래 1단으로 전환 */
+  .card-column.vertical .main-columns { flex-direction: column; }
+
+  /* 오른쪽 세로 구분선 -> 위쪽 가로 구분선으로 교체 */
+  .card-column.vertical .photo-section {
+    flex: 1 1 auto; width: 100%;
+    padding-left: 0; border-left: none;
+    margin-top: 22px; padding-top: 18px;
+    border-top: 1px solid rgba(0,0,0,0.07);
+  }
+
+  /* 세로형: 위쪽(사진 | 성향)을 아래쪽 INFO/NG와 똑같은 50:50 비율·간격으로 맞춰
+     좌우 경계선이 일직선으로 떨어지게 함 */
+  .card-column.vertical .content-row { gap: 22px; }
+  .card-column.vertical .photo-col,
+  .card-column.vertical .menu-col { flex: 1 1 0; width: auto; min-width: 0; padding-left: 0; }
+
+  /* 칼럼 폭이 유동적이므로 사진도 폭에 맞춰 늘어나는 정사각형으로 */
+  .card-column.vertical .photo-col > .frame {
+    width: 100%; height: auto; aspect-ratio: 1 / 1;
+  }
+
+  /* 세로형에서는 태그 영역이 좌측에 치우쳐 보이므로 가운데 정렬 */
+  .card-column.vertical .info-row { align-items: center; }
+  .card-column.vertical .row-chips { justify-content: center; }
+  .card-column.vertical .row-note,
+  .card-column.vertical .row-value { text-align: center; }
+
+  /* 레이아웃 전환 버튼 */
+  .layout-toggle { display: flex; gap: 6px; }
+  .layout-toggle button {
+    flex: 1; border: 1px solid var(--window-border); background: #f7f7f6;
+    color: var(--sub); border-radius: 8px; padding: 7px; font-size: 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .layout-toggle button.active {
+    background: var(--accent); border-color: var(--accent); color: white; font-weight: 700;
+  }
+
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+
+  <div class="sticker-bar">
+    <span>🖼 스티커</span>
+    <button id="addStickerBtn" type="button">＋ PNG 올리기</button>
+  </div>
+  <input type="file" id="stickerInput" accept="image/png,image/*">
+
+  <div class="workspace">
+
+    <div class="card-column" id="captureTarget">
+
+      <!-- 프로필 창 -->
+      <div class="window" id="mainWindow">
+        <div class="titlebar">
+          <div class="traffic-dots">
+            <span class="dot pink"></span><span class="dot yellow"></span><span class="dot green"></span>
+          </div>
+          <div class="titlebar-icons"><span>ℹ</span><span>♥</span><span>✕</span></div>
+        </div>
+
+        <div class="window-body">
+          <div class="content-panel">
+            <div class="main-columns">
+              <div class="left-column">
+                <div class="content-row">
+                  <div class="photo-col">
+                    <div class="frame empty" id="photoFrame">
+                      <span class="empty-label">클릭해서 사진 업로드</span>
+                    </div>
+                    <div class="display-name" contenteditable="true">Blueming</div>
+                    <div class="contact-note" contenteditable="true">연락은 <u>DM 또는 멘션</u></div>
+                  </div>
+
+                  <!-- 사진 옆 상단: 연령/트윗성향/이별시 태그 -->
+                  <div class="menu-col">
+                    <div class="stat-bar">
+                      <div class="info-rows" id="infoRows"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 하단: INFO(왼쪽) / NG(오른쪽) 2단 -->
+                <div class="info-columns">
+                  <div class="info-block">
+                    <div class="info-title">INFO</div>
+                    <div class="info-body" contenteditable="true">여기에 나에대해 적어주세요</div>
+                  </div>
+                  <div class="info-block">
+                    <div class="info-title">NG</div>
+                    <div class="info-body" contenteditable="true">여기에 NG 항목을 적어주세요</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 이미지 그리드: 이제 아래가 아니라 오른쪽에 세로 구분선으로 이어붙임 -->
+              <div class="photo-section">
+                <div class="photo-section-header">
+                  <div class="section-title" contenteditable="true">좋아하는것, 장르소개, 페어소개 OK!</div>
+                  <div class="section-caption" contenteditable="true">출처는 여기에 기입</div>
+                </div>
+                <div class="photo-grid" id="photoGrid"></div>
+                <button class="add-cell-btn" id="addCellBtn" type="button">＋ 이미지 칸 추가</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 사이드 패널: 톤 설정 + 안내 -->
+    <div class="side-panel">
+      <div>
+        <h3>레이아웃</h3>
+        <div class="layout-toggle">
+          <button id="layoutHorizontal" class="active" type="button">가로형</button>
+          <button id="layoutVertical" type="button">세로형</button>
+        </div>
+      </div>
+
+      <div>
+        <h3>톤 설정</h3>
+        <div class="tone-row">
+          <span>포인트 색상</span>
+          <input type="color" id="accentPicker" value="#8ec3cc">
+        </div>
+        <div class="tone-row">
+          <span>그라데이션 시작</span>
+          <input type="color" id="gradStart" value="#eef6f6">
+        </div>
+        <div class="tone-row">
+          <span>그라데이션 끝</span>
+          <input type="color" id="gradEnd" value="#dfeceb">
+        </div>
+        <button class="reset-tone-btn" id="resetToneBtn" type="button">기본값으로 초기화</button>
+      </div>
+
+      <div>
+        <h3>사용법</h3>
+        <ul>
+          <li><span>✏️</span><span>글자는 <b>클릭</b>해서 수정</span></li>
+          <li><span>🖼</span><span>사진 영역 <b>클릭</b>해서 업로드</span></li>
+          <li><span>✋🖱</span><span><b>드래그</b> 이동 / <b>휠</b> 확대·축소</span></li>
+          <li><span>➕</span><span>이미지 칸은 <b>추가 버튼</b>으로 늘리기</span></li>
+          <li><span>✕</span><span>칸에 마우스를 올리면 <b>삭제</b> 버튼 등장</span></li>
+          <li><span>🏷</span><span>그리드 이미지의 <b>캡션</b> 버튼으로 켜기/끄기</span></li>
+          <li><span>🔘</span><span>연령·트윗성향은 <b>클릭</b>해서 선택</span></li>
+          <li><span>🖼</span><span>상단 <b>스티커</b> 버튼으로 PNG 붙이기</span></li>
+          <li><span>✋</span><span>스티커는 드래그 이동, 클릭 시 크기조절(●)·삭제(✕)</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <button class="save-btn" id="saveBtn">PNG로 저장</button>
+
+  <script>
+    /* ---------- 재사용: 드래그 가능한 이미지 프레임 (이전 단계와 동일) ---------- */
+    function createDraggableFrame(frameEl, inputEl) {
+      let imgEl = null;
+      const state = { x: 0, y: 0, scale: 1 };
+      let isDragging = false;
+      const dragStart = { x: 0, y: 0 };
+
+      const changeOverlay = document.createElement('div');
+      changeOverlay.className = 'change-overlay';
+      changeOverlay.textContent = '🔄';
+      frameEl.appendChild(changeOverlay);
+
+      changeOverlay.addEventListener('mousedown', (e) => e.stopPropagation());
+      changeOverlay.addEventListener('click', (e) => { e.stopPropagation(); inputEl.click(); });
+
+      function applyTransform() {
+        imgEl.style.transform =
+          `translate(-50%, -50%) translate(${state.x}px, ${state.y}px) scale(${state.scale})`;
+      }
+
+      frameEl.addEventListener('click', () => { if (!imgEl) inputEl.click(); });
+
+      inputEl.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          frameEl.classList.remove('empty');
+          frameEl.classList.add('has-image');
+          const label = frameEl.querySelector('.empty-label');
+          if (label) label.style.display = 'none';
+          if (imgEl) imgEl.remove();
+          imgEl = document.createElement('img');
+          imgEl.src = event.target.result;
+          frameEl.insertBefore(imgEl, changeOverlay);
+          state.x = 0; state.y = 0; state.scale = 1;
+          imgEl.onload = applyTransform;
+        };
+        reader.readAsDataURL(file);
+        inputEl.value = '';
+      });
+
+      frameEl.addEventListener('mousedown', (e) => {
+        if (!imgEl || e.target === changeOverlay) return;
+        isDragging = true;
+        frameEl.classList.add('dragging');
+        dragStart.x = e.clientX - state.x;
+        dragStart.y = e.clientY - state.y;
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        state.x = e.clientX - dragStart.x;
+        state.y = e.clientY - dragStart.y;
+        applyTransform();
+      });
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+        frameEl.classList.remove('dragging');
+      });
+      frameEl.addEventListener('wheel', (e) => {
+        if (!imgEl) return;
+        e.preventDefault();
+        // 현재 배율에 비례해 조절 -> 많이 축소한 상태에서도 미세하게 조정 가능
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        state.scale = Math.min(Math.max(state.scale * (1 + delta), 0.15), 6);
+        applyTransform();
+      });
+    }
+
+    createDraggableFrame(document.getElementById('photoFrame'), (() => {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'image/*';
+      document.body.appendChild(input);
+      return input;
+    })());
+
+    /* ---------- 1. 톤 / 그라데이션 커스터마이징 ---------- */
+    // hex 색상 문자열("#8ec3cc")을 {r,g,b} 숫자로 분해하는 유틸 함수
+    function hexToRgb(hex) {
+      const clean = hex.replace('#', '');
+      const num = parseInt(clean, 16);
+      return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+    }
+
+    const root = document.documentElement;
+    const accentPicker = document.getElementById('accentPicker');
+    const gradStart = document.getElementById('gradStart');
+    const gradEnd = document.getElementById('gradEnd');
+    const mainWindow = document.getElementById('mainWindow');
+
+    // 포인트 색상: 이름 글자색, 메뉴 아이콘, 점선 테두리 등에 즉시 반영
+    accentPicker.addEventListener('input', (e) => {
+      const { r, g, b } = hexToRgb(e.target.value);
+      root.style.setProperty('--accent', e.target.value);
+      // 버튼 배경은 포인트색을 살짝 옅게(투명도) 만들어서 자동 생성
+      root.style.setProperty('--btn-bg', `rgba(${r},${g},${b},0.16)`);
+      root.style.setProperty('--btn-bg-hover', `rgba(${r},${g},${b},0.26)`);
+    });
+
+    // 그라데이션 배경: 두 색상 중 하나라도 바뀌면 즉시 창 배경에 반영
+    function applyGradient() {
+      mainWindow.style.background = `linear-gradient(135deg, ${gradStart.value}, ${gradEnd.value})`;
+    }
+    gradStart.addEventListener('input', applyGradient);
+    gradEnd.addEventListener('input', applyGradient);
+
+    document.getElementById('resetToneBtn').addEventListener('click', () => {
+      accentPicker.value = '#8ec3cc';
+      gradStart.value = '#eef6f6';
+      gradEnd.value = '#dfeceb';
+      root.style.removeProperty('--accent');
+      root.style.removeProperty('--btn-bg');
+      root.style.removeProperty('--btn-bg-hover');
+      mainWindow.style.background = '';
+    });
+
+    /* INFO / NG 블록은 이제 고정된 제목 + contenteditable 본문이라
+       별도의 추가/삭제 로직 없이 HTML의 contenteditable만으로 편집돼요 */
+
+    /* ---------- 연령/장르/성향/기타 행: 추가/삭제 + 칩 선택 ---------- */
+    const infoRows = document.getElementById('infoRows');
+
+    // 라벨과 자유 텍스트 값으로 이루어진 행 (장르, 기타 등)
+    function addTextRow(label, value) {
+      const row = document.createElement('div');
+      row.className = 'info-row';
+      row.innerHTML = `
+        <span class="row-label" contenteditable="true">${label}</span>
+        <span class="row-value" contenteditable="true">${value}</span>
+      `;
+      infoRows.appendChild(row);
+    }
+
+    // 값을 직접 타이핑하는 대신 여러 선택지 중 하나를 클릭해서 고르는 행 (연령 등)
+    function addChipRow(label, options) {
+      const row = document.createElement('div');
+      row.className = 'info-row';
+      const chipsHtml = options
+        .map((opt, i) => `<button type="button" class="chip${i === 0 ? ' selected' : ''}">${opt}</button>`)
+        .join('');
+      row.innerHTML = `
+        <span class="row-label" contenteditable="true">${label}</span>
+        <span class="row-chips">${chipsHtml}</span>
+      `;
+      infoRows.appendChild(row);
+
+      // 칩 중 하나를 클릭하면 그 칩만 선택 상태(selected)가 되도록 나머지는 해제
+      row.querySelectorAll('.chip').forEach((chip) => {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          row.querySelectorAll('.chip').forEach((c) => c.classList.remove('selected'));
+          chip.classList.add('selected');
+        });
+      });
+    }
+
+    // 연령과 달리 "여러 개를 동시에" 켜고 끌 수 있는 칩 행 (트윗 성향)
+    // 옵션 배열에 '\n'을 넣으면 그 지점에서 줄이 바뀜
+    function addMultiChipRow(label, options) {
+      const row = document.createElement('div');
+      row.className = 'info-row';
+      const chipsHtml = options
+        .map((opt) => opt === '\n'
+          ? '<span class="chip-break"></span>'
+          : `<button type="button" class="chip">${opt}</button>`)
+        .join('');
+      row.innerHTML = `
+        <span class="row-label" contenteditable="true">${label}</span>
+        <span class="row-chips">${chipsHtml}</span>
+      `;
+      infoRows.appendChild(row);
+
+      // 다른 칩엔 손대지 않고, 클릭한 칩 자기 자신의 선택 상태만 토글
+      row.querySelectorAll('.chip').forEach((chip) => {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          chip.classList.toggle('selected');
+        });
+      });
+    }
+
+    // 라벨 아래에 선택형 칩(여러 개 동시 선택 가능), 맨 아래에 작은 설명 텍스트가 붙는 행 (이별시 등)
+    function addTextChipRow(label, note, options) {
+      const row = document.createElement('div');
+      row.className = 'info-row';
+      const chipsHtml = options
+        .map((opt) => `<button type="button" class="chip">${opt}</button>`)
+        .join('');
+      row.innerHTML = `
+        <span class="row-label" contenteditable="true">${label}</span>
+        <span class="row-chips">${chipsHtml}</span>
+        <span class="row-note" contenteditable="true">${note}</span>
+      `;
+      infoRows.appendChild(row);
+
+      // 다른 칩엔 손대지 않고 자기 자신만 토글 -> 블락+뮤트처럼 중복 선택 가능
+      row.querySelectorAll('.chip').forEach((chip) => {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          chip.classList.toggle('selected');
+        });
+      });
+    }
+
+    // 고정 3개, 세로로 나열 (추가/삭제 없음 — 라벨/값 텍스트만 자유롭게 수정)
+    addChipRow('연령', ['성인', '미성년']);
+    addMultiChipRow('트윗 성향', ['RT', '마음', '소비', '연성', '\n', '탐라대화', '일상', '드림']);
+    addTextChipRow('이별시', '재연결 OK 또는 트정악의X', ['블락', '블언블', '뮤트']);
+
+    /* ---------- 3. 캡션 있는 이미지 그리드: 칸 추가/삭제 ---------- */
+    const photoGrid = document.getElementById('photoGrid');
+
+    function addPhotoCell(withCaption, captionTitle, captionTags) {
+      const cell = document.createElement('div');
+      cell.className = 'photo-cell';
+      cell.innerHTML = `
+        <div class="cell-remove" title="칸 삭제">✕</div>
+        <div class="frame photo-cell-frame empty">
+          <span class="empty-label">클릭해서 이미지 업로드</span>
+        </div>
+        <div class="caption-toggle" title="캡션 켜기/끄기">캡션</div>
+        <div class="caption-bar" style="display:none;">
+          <div class="caption-title" contenteditable="true">커플 X 이름</div>
+          <div class="caption-tags" contenteditable="true">#해시태그</div>
+        </div>
+      `;
+      photoGrid.appendChild(cell);
+
+      // 이 칸 전용 파일 인풋을 동적으로 만들어서 드래그 가능한 프레임으로 연결
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file'; fileInput.accept = 'image/*';
+      cell.appendChild(fileInput);
+      createDraggableFrame(cell.querySelector('.frame'), fileInput);
+
+      // 칸 전체 삭제
+      cell.querySelector('.cell-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        cell.remove();
+      });
+
+      // 캡션 버튼 하나로 켜기/끄기 (별도의 ✕ 버튼 없음 -> 캡션 글씨가 정확히 가운데 정렬됨)
+      const captionToggle = cell.querySelector('.caption-toggle');
+      const captionBar = cell.querySelector('.caption-bar');
+      captionToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOn = captionBar.style.display !== 'none';
+        captionBar.style.display = isOn ? 'none' : 'block';
+        captionToggle.classList.toggle('on', !isOn);
+      });
+
+      if (withCaption) {
+        captionBar.style.display = 'block';
+        captionToggle.classList.add('on');
+        captionBar.querySelector('.caption-title').textContent = captionTitle;
+        captionBar.querySelector('.caption-tags').textContent = captionTags;
+      }
+    }
+
+    // 기본 2칸 (참고 이미지와 동일하게: 첫 칸은 캡션 있음, 둘째 칸은 없음)
+    addPhotoCell(true, '커플링/장르명', '#좋아하는거 #페어명 #아무거나 #다좋아');
+    addPhotoCell(false);
+
+    document.getElementById('addCellBtn').addEventListener('click', () => addPhotoCell(false));
+
+    /* ---------- 4. 스티커: PNG를 카드 위에 붙이고 드래그/크기조절/삭제 ---------- */
+    const card = document.getElementById('captureTarget');
+    const stickerInput = document.getElementById('stickerInput');
+    let zCounter = 50;
+    let selectedSticker = null;
+
+    document.getElementById('addStickerBtn').addEventListener('click', () => stickerInput.click());
+
+    stickerInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => addSticker(event.target.result);
+      reader.readAsDataURL(file);
+      stickerInput.value = ''; // 같은 파일을 다시 골라도 change가 일어나도록 초기화
+    });
+
+    function addSticker(imageDataUrl) {
+      const sticker = document.createElement('div');
+      sticker.className = 'sticker';
+      // 카드 폭을 기준으로 중앙 근처에 살짝 랜덤하게 배치 (가로형/세로형 모두 대응)
+      const cw = card.offsetWidth;
+      sticker.style.left = `${cw / 2 - 55 + (Math.random() * 60 - 30)}px`;
+      sticker.style.top = `${180 + Math.random() * 60}px`;
+
+      const img = document.createElement('img');
+      img.src = imageDataUrl;
+
+      const del = document.createElement('div');
+      del.className = 'sticker-delete';
+      del.textContent = '✕';
+      const resize = document.createElement('div');
+      resize.className = 'sticker-resize';
+
+      sticker.append(img, del, resize);
+      card.appendChild(sticker);
+
+      makeStickerInteractive(sticker, del, resize);
+      selectSticker(sticker);
+    }
+
+    function selectSticker(sticker) {
+      if (selectedSticker) selectedSticker.classList.remove('selected');
+      selectedSticker = sticker;
+      sticker.classList.add('selected');
+      sticker.style.zIndex = ++zCounter; // 방금 만진 스티커가 항상 맨 위로
+    }
+
+    // 카드의 빈 곳을 누르면 선택 해제
+    card.addEventListener('mousedown', (e) => {
+      if (!e.target.closest('.sticker') && selectedSticker) {
+        selectedSticker.classList.remove('selected');
+        selectedSticker = null;
+      }
+    });
+
+    function makeStickerInteractive(sticker, delHandle, resizeHandle) {
+      let isDragging = false, isResizing = false;
+      const dragStart = { x: 0, y: 0 };
+      let startLeft = 0, startTop = 0, startWidth = 0, startHeight = 0;
+
+      sticker.addEventListener('mousedown', (e) => {
+        if (e.target === delHandle || e.target === resizeHandle) return;
+        e.stopPropagation();
+        selectSticker(sticker);
+        isDragging = true;
+        sticker.classList.add('dragging');
+        dragStart.x = e.clientX; dragStart.y = e.clientY;
+        startLeft = sticker.offsetLeft; startTop = sticker.offsetTop;
+      });
+
+      delHandle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        sticker.remove();
+        if (selectedSticker === sticker) selectedSticker = null;
+      });
+
+      resizeHandle.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        isResizing = true;
+        dragStart.x = e.clientX; dragStart.y = e.clientY;
+        startWidth = sticker.offsetWidth; startHeight = sticker.offsetHeight;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          sticker.style.left = `${startLeft + (e.clientX - dragStart.x)}px`;
+          sticker.style.top = `${startTop + (e.clientY - dragStart.y)}px`;
+        }
+        if (isResizing) {
+          // 오른쪽 아래로 끌수록 커짐. 가로세로 비율은 유지
+          const delta = ((e.clientX - dragStart.x) + (e.clientY - dragStart.y)) / 2;
+          const newWidth = Math.min(Math.max(startWidth + delta, 30), 500);
+          sticker.style.width = `${newWidth}px`;
+          sticker.style.height = `${startHeight * (newWidth / startWidth)}px`;
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false; isResizing = false;
+        sticker.classList.remove('dragging');
+      });
+    }
+
+    /* ---------- 5. 레이아웃 전환 (가로형 / 세로형) ---------- */
+    const cardColumn = document.getElementById('captureTarget');
+    const btnHorizontal = document.getElementById('layoutHorizontal');
+    const btnVertical = document.getElementById('layoutVertical');
+
+    // .vertical 클래스 하나만 붙이고 떼면 CSS가 알아서 레이아웃을 바꿔줌
+    btnHorizontal.addEventListener('click', () => {
+      cardColumn.classList.remove('vertical');
+      btnHorizontal.classList.add('active');
+      btnVertical.classList.remove('active');
+    });
+    btnVertical.addEventListener('click', () => {
+      cardColumn.classList.add('vertical');
+      btnVertical.classList.add('active');
+      btnHorizontal.classList.remove('active');
+    });
+
+    /* ---------- PNG 저장 (프로필 창 + 이미지 그리드 + 스티커 전체) ---------- */
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.addEventListener('click', async () => {
+      // 저장 전에 스티커 선택 표시(점선/핸들)를 지워야 이미지에 안 찍힘
+      if (selectedSticker) {
+        selectedSticker.classList.remove('selected');
+        selectedSticker = null;
+      }
+      saveBtn.disabled = true;
+      saveBtn.textContent = '저장 중...';
+      const canvas = await html2canvas(document.getElementById('captureTarget'), {
+        scale: 3, useCORS: true, backgroundColor: '#ffffff'
+      });
+      const link = document.createElement('a');
+      link.download = 'my-card.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'PNG로 저장';
+    });
+  </script>
+
+</body>
+</html>
