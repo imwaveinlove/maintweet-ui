@@ -71,7 +71,7 @@
 
   /* min-width: 0 이 없으면 flex 아이템이 내용물 크기 아래로 줄어들지 못해
      안쪽 고정폭 칸들 때문에 레이아웃이 밀려남 */
-  .left-column { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; }
+  .left-column { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; }
   .content-row { display: flex; gap: 22px; }
 
   /* 사진 칸도 아래 INFO 칸과 똑같이 절반씩 나눠 가져서 좌우 폭이 일치 */
@@ -155,15 +155,17 @@
   .row-chips { display: flex; flex-direction: row; gap: 6px; flex-wrap: wrap; justify-content: flex-start; width: 100%; }
   .chip {
     border: 1px solid var(--window-border); background: white; color: var(--sub);
-    border-radius: 20px; padding: 3px 11px; font-size: 11px; cursor: pointer;
+    border-radius: 20px; padding: 3px 10px; font-size: 11px; cursor: pointer;
     transition: all 0.15s;
     /* 칩 안의 글자가 "탐라대/화"처럼 쪼개지지 않도록 */
     white-space: nowrap; flex-shrink: 0;
   }
   .chip.selected { background: var(--accent); border-color: var(--accent); color: white; font-weight: 700; }
 
-  /* 폭이 0이면서 줄 전체를 차지 -> flex 줄바꿈을 강제로 일으키는 투명 요소 */
-  .chip-break { flex-basis: 100%; height: 0; }
+  /* 폭이 0이면서 줄 전체를 차지 -> flex 줄바꿈을 강제로 일으키는 투명 요소.
+     가로형은 태그 칸이 좁아 강제 줄바꿈이 오히려 어색하므로 세로형에서만 적용 */
+  .chip-break { display: none; }
+  .card-column.vertical .chip-break { display: block; flex-basis: 100%; height: 0; }
 
   /* 연령/트윗성향/이별시: 사진 옆 상단 영역 */
   .stat-bar {
