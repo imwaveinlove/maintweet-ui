@@ -300,13 +300,13 @@
     z-index: 50;
   }
   .sticker img {
+    display: block;
     width: 100%; height: 100%;
-    /* 상자가 이미 원본 비율이라 fill로 늘려도 왜곡되지 않음.
+    /* 상자가 이미 원본 비율이라 늘려도 왜곡되지 않음.
        object-fit은 html2canvas가 무시하므로 의존하지 않는다 */
     object-fit: fill;
     pointer-events: none;     /* 드래그는 부모(.sticker)가 담당 */
     -webkit-user-drag: none;
-    display: block;
   }
   .sticker.dragging { cursor: grabbing; }
   .sticker.selected { outline: 2px dashed var(--accent); outline-offset: 5px; border-radius: 4px; }
@@ -789,14 +789,6 @@
       sticker.style.top = `${180 + Math.random() * 60}px`;
 
       const img = document.createElement('img');
-      img.src = imageDataUrl;
-
-      // 이미지가 로드되면 원본 가로세로 비율을 읽어서 상자 높이를 맞춤.
-      // 상자와 이미지 비율이 같아야 PNG로 저장할 때도 안 늘어남
-      img.onload = () => {
-        const ratio = img.naturalHeight / img.naturalWidth;
-        sticker.style.height = `${sticker.offsetWidth * ratio}px`;
-      };
 
       const del = document.createElement('div');
       del.className = 'sticker-delete';
@@ -806,6 +798,20 @@
 
       sticker.append(img, del, resize);
       card.appendChild(sticker);
+
+      // 이미지가 로드되면 원본 가로세로 비율을 읽어서 상자 크기를 확정.
+      // 상자와 이미지 비율이 같아야 PNG로 저장할 때도 안 늘어남.
+      // (offsetWidth 대신 고정 기준폭을 쓰므로 DOM 삽입 타이밍과 무관하게 항상 정확)
+      const BASE_W = 110;
+      function fitToImage() {
+        if (!img.naturalWidth) return;
+        const ratio = img.naturalHeight / img.naturalWidth;
+        sticker.style.width = `${BASE_W}px`;
+        sticker.style.height = `${BASE_W * ratio}px`;
+      }
+      img.onload = fitToImage;
+      img.src = imageDataUrl;
+      if (img.complete) fitToImage(); // 이미 로드가 끝난 경우(캐시 등) 대비
 
       makeStickerInteractive(sticker, del, resize);
       selectSticker(sticker);
