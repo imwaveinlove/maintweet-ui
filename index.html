@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>메인트 편집기 @blueming</title>
+<title>메인트 편집기 @momocometo</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Gaegu:wght@700&family=Jua&display=swap" rel="stylesheet">
 <style>
@@ -72,9 +72,10 @@
   /* min-width: 0 이 없으면 flex 아이템이 내용물 크기 아래로 줄어들지 못해
      안쪽 고정폭 칸들 때문에 레이아웃이 밀려남 */
   .left-column { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; }
-  .content-row { display: flex; gap: 26px; }
+  .content-row { display: flex; gap: 22px; }
 
-  .photo-col { width: 190px; flex-shrink: 0; }
+  /* 사진 칸도 아래 INFO 칸과 똑같이 절반씩 나눠 가져서 좌우 폭이 일치 */
+  .photo-col { flex: 1 1 0; width: auto; min-width: 0; }
   /* 사진 아래 이름·연락 문구가 사진 폭 기준 정확히 가운데 오도록 */
   .photo-col .display-name,
   .photo-col .contact-note { width: 100%; text-align: center; }
@@ -93,7 +94,7 @@
     position: absolute; top: 50%; left: 50%; max-width: none;
     user-select: none; -webkit-user-drag: none; pointer-events: none;
   }
-  .photo-col > .frame { width: 190px; height: 190px; }
+  .photo-col > .frame { width: 100%; height: auto; aspect-ratio: 1 / 1; }
 
   /* 이미지 변경 버튼: 프레임 전체가 아니라 오른쪽 위 작은 원형 버튼으로만 존재해야
      드래그(mousedown)가 이 버튼 밖 영역에서는 정상적으로 먹힘 */
@@ -348,16 +349,11 @@
     border-top: 1px solid rgba(0,0,0,0.07);
   }
 
-  /* 세로형: 위쪽(사진 | 성향)을 아래쪽 INFO/NG와 똑같은 50:50 비율·간격으로 맞춰
-     좌우 경계선이 일직선으로 떨어지게 함 */
-  .card-column.vertical .content-row { gap: 22px; }
-  .card-column.vertical .photo-col,
-  .card-column.vertical .menu-col { flex: 1 1 0; width: auto; min-width: 0; padding-left: 0; }
-
-  /* 칼럼 폭이 유동적이므로 사진도 폭에 맞춰 늘어나는 정사각형으로 */
-  .card-column.vertical .photo-col > .frame {
-    width: 100%; height: auto; aspect-ratio: 1 / 1;
-  }
+  /* 세로형: 이미지 그리드 칸도 위쪽 INFO/NG와 같은 22px 간격 + 50:50으로 맞춰
+     네 영역의 좌우 경계선이 모두 일직선으로 떨어지게 함
+     (사진 칸 50:50과 정사각형 프레임은 이제 기본 규칙에 포함되어 있음) */
+  .card-column.vertical .photo-grid { gap: 22px; }
+  .card-column.vertical .photo-cell { width: calc(50% - 11px); }
 
   /* 세로형에서는 태그 영역이 좌측에 치우쳐 보이므로 가운데 정렬 */
   .card-column.vertical .info-row { align-items: center; }
