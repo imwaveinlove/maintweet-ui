@@ -4,21 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>메인트 편집기 @whitecometo</title>
+<!-- 파비콘: 업로드한 하트 아이콘을 base64로 직접 삽입 (별도 파일 불필요) -->
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABwklEQVR42u2aO27CQBCG14irJE0UaFL4Gj4DhwDJNRI5hM/gY9gSafIqSA6zKWBtaxkns48xG/n/KsRj2J3554VQCgAAAAAAADBHstgG9eqgO+NvuyxVm4bF3BWwjB75123/3FrpkKhJ2IQCYtcAKkpXrJ+d8lfCJhQQWwGsKDlELrY9KMC3Cwx7rkjvvURYq62WvhznLkuOBIetx1uqUhiHMs9ot1GkACui5rVs9z9uxbiLUQIUEM3SpR0lEWW0QSEFNMeTVpuajvy+mPbk5nstJTTHk1N7zcg2OGK8ffnqHufGEVNf3KY8n6Ot+nPkT/fjzrImR6QAKa1fCsz75/fZy4ldxJzr8eFuvGAShXr2ClgMZ+RoM39Zd7lJ5Ssnp1n2fNZf656oAZSHzJh4RcWs+KYz2FHjdIx94fc5xlBGKRwK4HpKKaUaVbjt8L4zQuBs4VLLnHeBvs18+BXHv9Jj+B6vc2EXkN0G801AOxoWODvKZdhobc7VVgUU4LUMudItT4ksQ/hZfGoF3FwJgZGP5gDSIVLOKGv8PyC5FBBNj0gyhwJupQCv+iCQ51BAKgog64PHBgcFAAAAAAAAAEAgP0Hm1+A3IQ2RAAAAAElFTkSuQmCC">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Gaegu:wght@700&family=Jua&display=swap" rel="stylesheet">
 <style>
   :root {
-    --page-bg: #eef1ef;
-    --window-border: #dfe4e3;
+    --page-bg: #f6eff1;
+    --window-border: #eddfe4;
     --card-bg: #ffffff;
-    --ink: #55676a;
-    --sub: #9aa8aa;
-    --accent: #8ec3cc;       /* 사용자가 바꿀 수 있는 포인트 색 */
-    --btn-bg: rgba(142,195,204,0.16);
-    --btn-bg-hover: rgba(142,195,204,0.26);
-    --dot-pink: #f0b8c2;
-    --dot-yellow: #f3dca0;
-    --dot-green: #b7dcc2;
+    --ink: #6b5058;
+    --sub: #b096a0;
+    --accent: #f2a3c0;       /* 사용자가 바꿀 수 있는 포인트 색 (아이콘 하트 톤) */
+    --btn-bg: rgba(242,163,192,0.16);
+    --btn-bg-hover: rgba(242,163,192,0.26);
+    --dot-pink: #f7a8a8;    /* 파스텔 빨강 — 포인트 색과 무관하게 고정 */
+    --dot-yellow: #f7dc9c;  /* 파스텔 노랑 */
+    --dot-green: #a8cff0;   /* 파스텔 하늘색 */
   }
 
   * { box-sizing: border-box; }
@@ -40,7 +42,7 @@
     border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 8px 28px rgba(90,110,110,0.10);
-    background: linear-gradient(135deg, #eef6f6, #dfeceb); /* 기본 그라데이션, 사용자가 교체 가능 */
+    background: linear-gradient(135deg, #fdf1f5, #f7e3ea); /* 기본 그라데이션, 사용자가 교체 가능 */
   }
 
   .titlebar {
@@ -54,7 +56,15 @@
   .dot.pink { background: var(--dot-pink); }
   .dot.yellow { background: var(--dot-yellow); }
   .dot.green { background: var(--dot-green); }
-  .titlebar-icons { display: flex; gap: 16px; color: var(--sub); font-size: 16px; }
+  /* 기호마다 글자 기준선이 달라 하트가 떠 보이므로,
+     flex + line-height:1로 각 아이콘의 세로 중심을 강제로 맞춤 */
+  .titlebar-icons { display: flex; align-items: center; gap: 16px; color: var(--sub); font-size: 15px; }
+  .titlebar-icons span {
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1; height: 16px;
+  }
+  /* 하트만 포인트 색을 따라감 */
+  .titlebar-icons .heart-icon { color: var(--accent); font-size: 16px; }
 
   .window-body { padding: 20px; }
 
@@ -82,7 +92,7 @@
 
   .frame {
     position: relative; overflow: hidden; cursor: grab;
-    background: linear-gradient(135deg, #eef4f4, #dfeaea);
+    background: linear-gradient(135deg, #fbeef2, #f3e2e7);
     border-radius: 10px;
   }
   .frame.dragging { cursor: grabbing; }
@@ -115,7 +125,7 @@
     cursor: text; transition: background 0.15s;
   }
   [contenteditable="true"]:hover { background: rgba(0,0,0,0.04); }
-  [contenteditable="true"]:focus { background: rgba(142,195,204,0.12); box-shadow: 0 0 0 2px var(--accent); }
+  [contenteditable="true"]:focus { background: rgba(242,163,192,0.14); box-shadow: 0 0 0 2px var(--accent); }
 
   /* Pacifico는 영문 전용 폰트라 한글 글자가 없음 -> 한글을 쓰면 그 글자만
      자동으로 다음 순서인 카드 기본 서체(Pretendard 등)로 대체됨 (폰트 스택의 문자 단위 fallback) */
@@ -195,7 +205,7 @@
   }
 
   .contact-note { margin-top: 8px; font-size: 12px; color: var(--sub); text-align: center; }
-  .contact-note u { color: #7a9098; }
+  .contact-note u { color: #96707e; }
 
   /* --- 오른쪽 열: 이미지 그리드. 위쪽 구분선 대신 왼쪽 세로 구분선으로 이어짐 --- */
   .photo-section {
@@ -204,7 +214,7 @@
     border-left: 1px solid rgba(0,0,0,0.07);
   }
   .photo-section-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; gap: 12px; }
-  .section-title { font-size: 15px; font-weight: 700; color: #3a4548; text-align: left; }
+  .section-title { font-size: 15px; font-weight: 700; color: #5d444c; text-align: left; }
   .section-caption { font-size: 12px; color: var(--sub); text-align: right; white-space: nowrap; }
 
   .photo-grid { display: flex; flex-wrap: wrap; gap: 14px; }
@@ -399,7 +409,7 @@
           <div class="traffic-dots">
             <span class="dot pink"></span><span class="dot yellow"></span><span class="dot green"></span>
           </div>
-          <div class="titlebar-icons"><span>ℹ</span><span>♥</span><span>✕</span></div>
+          <div class="titlebar-icons"><span>ℹ</span><span class="heart-icon">♥</span><span>✕</span></div>
         </div>
 
         <div class="window-body">
@@ -466,15 +476,15 @@
         <h3>톤 설정</h3>
         <div class="tone-row">
           <span>포인트 색상</span>
-          <input type="color" id="accentPicker" value="#8ec3cc">
+          <input type="color" id="accentPicker" value="#f2a3c0">
         </div>
         <div class="tone-row">
           <span>그라데이션 시작</span>
-          <input type="color" id="gradStart" value="#eef6f6">
+          <input type="color" id="gradStart" value="#fdf1f5">
         </div>
         <div class="tone-row">
           <span>그라데이션 끝</span>
-          <input type="color" id="gradEnd" value="#dfeceb">
+          <input type="color" id="gradEnd" value="#f7e3ea">
         </div>
         <button class="reset-tone-btn" id="resetToneBtn" type="button">기본값으로 초기화</button>
       </div>
@@ -576,7 +586,7 @@
     })());
 
     /* ---------- 1. 톤 / 그라데이션 커스터마이징 ---------- */
-    // hex 색상 문자열("#8ec3cc")을 {r,g,b} 숫자로 분해하는 유틸 함수
+    // hex 색상 문자열("#f2a3c0")을 {r,g,b} 숫자로 분해하는 유틸 함수
     function hexToRgb(hex) {
       const clean = hex.replace('#', '');
       const num = parseInt(clean, 16);
@@ -589,14 +599,18 @@
     const gradEnd = document.getElementById('gradEnd');
     const mainWindow = document.getElementById('mainWindow');
 
-    // 포인트 색상: 이름 글자색, 메뉴 아이콘, 점선 테두리 등에 즉시 반영
-    accentPicker.addEventListener('input', (e) => {
-      const { r, g, b } = hexToRgb(e.target.value);
-      root.style.setProperty('--accent', e.target.value);
+    // 포인트 색상: 이름 글자색, 아이콘, 점선 테두리 등에 즉시 반영
+    // (상태표시줄 신호등 점 3색은 파스텔 고정색이라 여기서 건드리지 않음)
+    function applyAccent(hex) {
+      const { r, g, b } = hexToRgb(hex);
+      root.style.setProperty('--accent', hex);
       // 버튼 배경은 포인트색을 살짝 옅게(투명도) 만들어서 자동 생성
       root.style.setProperty('--btn-bg', `rgba(${r},${g},${b},0.16)`);
       root.style.setProperty('--btn-bg-hover', `rgba(${r},${g},${b},0.26)`);
-    });
+    }
+
+    accentPicker.addEventListener('input', (e) => applyAccent(e.target.value));
+    applyAccent(accentPicker.value); // 처음 로드될 때도 한 번 적용
 
     // 그라데이션 배경: 두 색상 중 하나라도 바뀌면 즉시 창 배경에 반영
     function applyGradient() {
@@ -606,12 +620,10 @@
     gradEnd.addEventListener('input', applyGradient);
 
     document.getElementById('resetToneBtn').addEventListener('click', () => {
-      accentPicker.value = '#8ec3cc';
-      gradStart.value = '#eef6f6';
-      gradEnd.value = '#dfeceb';
-      root.style.removeProperty('--accent');
-      root.style.removeProperty('--btn-bg');
-      root.style.removeProperty('--btn-bg-hover');
+      accentPicker.value = '#f2a3c0';
+      gradStart.value = '#fdf1f5';
+      gradEnd.value = '#f7e3ea';
+      applyAccent('#f2a3c0');
       mainWindow.style.background = '';
     });
 
