@@ -905,17 +905,27 @@
         selectedSticker.classList.remove('selected');
         selectedSticker = null;
       }
+
+      // 편집할 때만 필요한 UI("＋ 이미지 칸 추가")는 저장 이미지에 안 나오도록 잠시 숨김
+      const addCellBtn = document.getElementById('addCellBtn');
+      addCellBtn.style.display = 'none';
+
       saveBtn.disabled = true;
       saveBtn.textContent = '저장 중...';
-      const canvas = await html2canvas(document.getElementById('captureTarget'), {
-        scale: 3, useCORS: true, backgroundColor: '#ffffff'
-      });
-      const link = document.createElement('a');
-      link.download = 'my-card.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'PNG로 저장';
+      try {
+        const canvas = await html2canvas(document.getElementById('captureTarget'), {
+          scale: 3, useCORS: true, backgroundColor: '#ffffff'
+        });
+        const link = document.createElement('a');
+        link.download = 'my-card.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } finally {
+        // 저장에 실패하더라도 버튼은 반드시 다시 보이게 복원
+        addCellBtn.style.display = '';
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'PNG로 저장';
+      }
     });
   </script>
 
